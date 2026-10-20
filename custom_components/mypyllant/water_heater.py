@@ -10,6 +10,7 @@ from homeassistant.components.water_heater import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -216,6 +217,12 @@ class DomesticHotWaterEntity(CoordinatorEntity, WaterHeaterEntity):
     @ensure_token_refresh
     async def async_set_temperature(self, **kwargs: Any) -> None:
         target_temp = kwargs.get(ATTR_TEMPERATURE)
+        if self.domestic_hot_water.is_cylinder_boosting:
+            # The API rejects setpoint changes during a boost with a 400 (G003)
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="dhw_temperature_during_boost",
+            )
         if isinstance(target_temp, (int, float)):
             await self.coordinator.api.set_domestic_hot_water_temperature(
                 self.domestic_hot_water, int(target_temp)

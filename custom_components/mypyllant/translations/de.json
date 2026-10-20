@@ -57,5 +57,10 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "dhw_temperature_during_boost": {
+      "message": "Die Warmwassertemperatur kann während der Speicher-Schnellaufheizung (Cylinder Boost) nicht geändert werden. Warte, bis die Schnellaufheizung beendet ist, oder wechsle vorher in eine andere Betriebsart."
+    }
   }
 }
