@@ -217,17 +217,30 @@ class DomesticHotWaterEntity(CoordinatorEntity, WaterHeaterEntity):
     @ensure_token_refresh
     async def async_set_temperature(self, **kwargs: Any) -> None:
         target_temp = kwargs.get(ATTR_TEMPERATURE)
+        if not isinstance(target_temp, (int, float)):
+            return
+        setpoint = int(target_temp)
+        # The API rejects setpoints outside of min/max with a 400 (G003)
+        if not self.min_temp <= setpoint <= self.max_temp:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="dhw_temperature_out_of_range",
+                translation_placeholders={
+                    "temperature": str(setpoint),
+                    "min_temp": f"{self.min_temp:g}",
+                    "max_temp": f"{self.max_temp:g}",
+                },
+            )
+        # Setpoint changes during a boost were also rejected with a 400 (G003)
         if self.domestic_hot_water.is_cylinder_boosting:
-            # The API rejects setpoint changes during a boost with a 400 (G003)
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="dhw_temperature_during_boost",
             )
-        if isinstance(target_temp, (int, float)):
-            await self.coordinator.api.set_domestic_hot_water_temperature(
-                self.domestic_hot_water, int(target_temp)
-            )
-            await self.coordinator.async_request_refresh_delayed()
+        await self.coordinator.api.set_domestic_hot_water_temperature(
+            self.domestic_hot_water, setpoint
+        )
+        await self.coordinator.async_request_refresh_delayed()
 
     @ensure_token_refresh
     async def async_set_operation_mode(

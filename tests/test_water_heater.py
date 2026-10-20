@@ -104,8 +104,32 @@ async def test_water_heater_set_temperature_during_boost(
             mocked_api, "set_domestic_hot_water_temperature"
         ) as set_temperature_mock:
             with pytest.raises(ServiceValidationError) as excinfo:
-                await dhw.async_set_temperature(**{ATTR_TEMPERATURE: 50})
+                await dhw.async_set_temperature(**{ATTR_TEMPERATURE: dhw.min_temp})
         assert excinfo.value.translation_key == "dhw_temperature_during_boost"
+        set_temperature_mock.assert_not_called()
+
+        await mocked_api.aiohttp_session.close()
+
+
+@pytest.mark.parametrize(
+    "test_data", list_test_data(only_with_systems=True, only_with_dhw=True)
+)
+async def test_water_heater_set_temperature_out_of_range(
+    mypyllant_aioresponses, mocked_api: MyPyllantAPI, system_coordinator_mock, test_data
+):
+    with mypyllant_aioresponses(test_data) as _:
+        system_coordinator_mock.data = (
+            await system_coordinator_mock._async_update_data()
+        )
+
+        dhw = DomesticHotWaterEntity(0, 0, system_coordinator_mock, {})
+        with mock.patch.object(
+            mocked_api, "set_domestic_hot_water_temperature"
+        ) as set_temperature_mock:
+            for temperature in (dhw.min_temp - 1, dhw.max_temp + 1):
+                with pytest.raises(ServiceValidationError) as excinfo:
+                    await dhw.async_set_temperature(**{ATTR_TEMPERATURE: temperature})
+                assert excinfo.value.translation_key == "dhw_temperature_out_of_range"
         set_temperature_mock.assert_not_called()
 
         await mocked_api.aiohttp_session.close()
